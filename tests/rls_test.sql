@@ -16,6 +16,8 @@ select agl.assert((select count(*) from parcel) = 1, 'customer sees exactly her 
 select agl.assert((select count(*) from party) = 2, 'customer sees both parties of her parcel');
 select agl.assert((select count(*) from customer_tracking_v) = 1, 'customer tracking view: one row');
 select agl.assert((select status from customer_tracking_v) = 'out_for_delivery', 'customer tracking status');
+select agl.assert((select delivery_window_start from customer_tracking_v) is not null and (select last_hub from customer_tracking_v) = 'HUB-MUC-2', 'customer tracking: full row incl. window and hub');
+do $$ begin perform relay_phone from stop; raise exception 'customer could read stop.relay_phone'; exception when insufficient_privilege then null; end $$;
 reset role;
 
 -- COURIER Lena (delivery of parcel 1, open): sees that stop, the recipient only, relay phone; not the sender, not parcel 2.
