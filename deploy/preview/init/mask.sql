@@ -5,8 +5,8 @@ update party set
   phone        = case when phone is null then null else '+' || left(regexp_replace(phone, '\D', '', 'g'), 2) || ' 700 000 ' || lpad((abs(hashtext(pseudonym)) % 1000)::text, 3, '0') end,
   email        = case when email is null then null else lower(substr(md5(pseudonym || 'e'), 1, 8)) || '@example.test' end,
   address_line = 'Masked street ' || (abs(hashtext(pseudonym)) % 200 + 1),
-  lat          = round(lat, 3), lng = round(lng, 3),
-  actor_id     = null;
+  lat          = round(lat, 3), lng = round(lng, 3);
+-- actor_id is kept: a masked customer account must still reach its own (masked) parcels in preview/staging.
 update actor set email = case when email is null then null else lower(substr(md5(id::text), 1, 8)) || '@example.test' end, display = role || ' ' || substr(md5(id::text), 1, 4);
 update parcel set payment_token = 'tok_masked_' || substr(md5(id::text), 1, 6);
 update stop set relay_phone = null;
