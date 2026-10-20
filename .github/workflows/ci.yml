@@ -1,0 +1,45 @@
+# Gate 1 for parcel-app (AI-Gov-Layer docs/08). GitHub-hosted runners; nothing here needs SERVER.
+name: ci
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  rls-test:
+    name: rls-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+      - run: ./tests/run.sh
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - run: docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --no-banner
+  ai-label:
+    name: ai-label
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git log --format=%B "$BASE..$HEAD" | grep -Eiq '^(AI-Assisted|Co-Authored-By):.*(claude|copilot|codex|cursor|gemini)'; then
+            gh pr edit "$PR" --add-label ai-assisted
+            gh pr view "$PR" --json body -q .body | grep -q '\- \[ \]' && { echo "::error::AI-assisted checklist has unticked items"; exit 1; }
+            echo "ai-assisted: labelled, checklist complete"
+          else echo "no AI trailer found"; fi
