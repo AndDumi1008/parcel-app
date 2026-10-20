@@ -21,6 +21,8 @@ create policy party_customer on party for select using (
   agl.actor_role() = 'customer' and exists (select 1 from parcel pc where pc.id in (select agl.my_parcel_ids()) and party.id in (pc.sender_id, pc.recipient_id)));
 create policy scan_customer on scan for select using (agl.actor_role() = 'customer' and parcel_id in (select agl.my_parcel_ids()));
 create policy pod_customer on pod for select using (agl.actor_role() = 'customer' and parcel_id in (select agl.my_parcel_ids()));
+-- customers see the delivery window of their own parcels' stops (column grant below keeps courier, relay number and geo out)
+create policy stop_customer on stop for select using (agl.actor_role() = 'customer' and parcel_id in (select agl.my_parcel_ids()));
 
 -- COURIER: stops assigned to them and not yet completed; the ONE party of that stop; parcel ref/weight; may insert scans for those stops.
 create or replace function agl.my_courier_id() returns uuid language sql stable security definer set search_path = public as $$
@@ -97,6 +99,7 @@ grant usage on schema public, agl to app_customer, app_courier, app_sorter, app_
 grant execute on all functions in schema agl to app_customer, app_courier, app_sorter, app_support, app_analyst, app_dispatcher;
 grant select on actor to app_customer, app_courier, app_sorter, app_support, app_analyst, app_dispatcher;
 grant select on parcel, party, scan, pod to app_customer;
+grant select (id, parcel_id, kind, window_start, window_end, completed_at) on stop to app_customer;
 grant select on parcel, party, stop, courier, scan to app_courier; grant insert on scan to app_courier;
 grant select on scan to app_sorter; grant insert on scan to app_sorter; grant select on sorter_parcel_v to app_sorter;
 grant select on support_parcel_v to app_support;

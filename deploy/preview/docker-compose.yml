@@ -1,0 +1,41 @@
+# parcel-app backend: PostgreSQL 16 + PostgREST (the Supabase data API core). One compose project per
+# environment (preview, staging, production), each on its own network; Caddy on SERVER joins the network.
+# Preview and staging load masked/synthetic data at init; production loads the seed unmasked (still synthetic in the PoC).
+name: ${STACK_NAME:-parcel-preview}
+networks:
+  net:
+    name: ${STACK_NAME:-parcel-preview}-net
+volumes:
+  db: {}
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTICATOR_PASSWORD: ${AUTHENTICATOR_PASSWORD}
+      MASK_DATA: ${MASK_DATA:-true}
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ../../supabase/migrations:/docker-entrypoint-initdb.d/010:ro
+      - ../../supabase/seed:/docker-entrypoint-initdb.d/015:ro
+      - ./init:/docker-entrypoint-initdb.d/020:ro
+      - ./init/000_order.sh:/docker-entrypoint-initdb.d/000_order.sh:ro
+    networks: [net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    image: postgrest/postgrest:v12.2.8
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_JWT_AUD: parcel
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [net]
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-54321}:3000"
