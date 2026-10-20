@@ -3,7 +3,7 @@
 # Usage: tests/api_test.sh <api base url> <jwt secret>
 set -euo pipefail
 cd "$(dirname "$0")/.."
-API="${1:-http://127.0.0.1:54321}"; export JWT_SECRET="${2:-${JWT_SECRET:?}}"
+API="${1:-http://127.0.0.1:54331}"; export JWT_SECRET="${2:-${JWT_SECRET:?}}"
 ok=0; bad=0
 check(){ if [ "$2" = "$3" ]; then echo "  PASS $1"; ok=$((ok+1)); else echo "  FAIL $1 (expected $2, got $3)"; bad=$((bad+1)); fi; }
 ANA=$(python3 scripts/jwt.py app_customer a0000000-0000-0000-0000-000000000001 customer)
