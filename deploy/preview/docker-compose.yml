@@ -1,12 +1,15 @@
-# parcel-app backend: PostgreSQL 16 + PostgREST (the Supabase data API core). One compose project per
-# environment (preview, staging, production), each on its own network; Caddy on SERVER joins the network.
-# Preview and staging load masked/synthetic data at init; production loads the seed unmasked (still synthetic in the PoC).
+# parcel-app stack: PostgreSQL 16 + PostgREST (the Supabase data API core) and the static frontend. One compose
+# project per environment (STACK_NAME=parcel-preview|parcel-staging|parcel-production), each on its own network;
+# Caddy on SERVER joins the network. Preview and staging load masked/synthetic data at init; production loads the
+# seed unmasked (still synthetic in the PoC).
 name: ${STACK_NAME:-parcel-preview}
 networks:
   net:
     name: ${STACK_NAME:-parcel-preview}-net
 volumes:
   db: {}
+  web: {}
+  web-keys: {}
 services:
   db:
     image: postgres:16
@@ -39,3 +42,29 @@ services:
     networks: [net]
     ports:
       - "${API_BIND:-127.0.0.1}:${API_PORT:-54321}:3000"
+  # Frontend (AI-Gov-Layer PD-44/PD-45): web serves the release in the web volume read-only; web-deploy is the
+  # only writer, over SSH with a forced command. Neither publishes a port: the AGL Caddy reaches web over this
+  # network, and only the runner allowed into this environment reaches web-deploy.
+  web:
+    image: caddy:2.9
+    read_only: true
+    tmpfs: [/data, /config]
+    volumes:
+      - ../web/Caddyfile:/etc/caddy/Caddyfile:ro
+      - web:/srv:ro
+    networks: [net]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  web-deploy:
+    build: ../web/web-deploy
+    image: parcel-web-deploy:local
+    environment:
+      WEB_DEPLOY_PUBKEY: ${WEB_DEPLOY_PUBKEY}
+      STACK_NAME: ${STACK_NAME:-parcel-preview}
+    volumes:
+      - web:/srv
+      - web-keys:/keys
+    networks: [net]

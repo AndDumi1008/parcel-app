@@ -1,0 +1,3 @@
+# Pinned host keys of the web-deploy accounts, one line per environment: web-deploy-<env> ssh-ed25519 AAAA...
+# The web-deploy container prints its line at start (docker logs parcel-<env>-web-deploy-1); commit it here.
+# scripts/web-remote.sh refuses an environment that has no line.

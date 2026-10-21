@@ -1,0 +1,68 @@
+#!/bin/sh
+# Forced command of the web deploy account (AI-Gov-Layer PD-44/PD-45). sshd runs this for every login, whatever
+# the client asked for. Accepted requests, each printing the digest now served:
+#   deploy sha256:<hex> https://<backend-host>[:port]   artifact tar on stdin
+#   rollback                                            back to the previous release (repeating it toggles)
+#   status
+# Layout of the web volume (/srv): releases/<hex>/, current -> releases/<hex>, previous -> releases/<hex>,
+# config.json. The web container mounts the same volume read-only.
+set -eu
+umask 022
+ROOT=/srv
+MAX_BYTES=209715200 # 200 MiB
+die(){ echo "web-deploy: $*" >&2; exit 1; }
+served(){ t=$(readlink "$ROOT/$1" 2>/dev/null) || return 0; echo "${t##*/}"; }
+# point <link> <hex>: switch the link in one rename, so the web container never sees it missing
+point(){ ln -sfn "releases/$2" "$ROOT/.$1.new" && mv -fT "$ROOT/.$1.new" "$ROOT/$1"; }
+
+set -f
+# shellcheck disable=SC2086 # word splitting of the client's request is the parser
+set -- ${SSH_ORIGINAL_COMMAND:-}
+mkdir -p "$ROOT/releases" "$ROOT/incoming"
+exec 9>"$ROOT/.lock"
+flock 9
+
+case "${1:-} $#" in
+  "deploy 3")
+    digest=$2 url=$3 hex=${2#sha256:}
+    { [ "sha256:$hex" = "$digest" ] && printf '%s' "$hex" | grep -Eqx '[0-9a-f]{64}'; } || die "digest must be sha256:<64 hex>"
+    printf '%s' "$url" | grep -Eqx 'https://[A-Za-z0-9.-]+(:[0-9]{1,5})?' || die "backend URL must be https://host[:port]"
+    up=$(mktemp "$ROOT/incoming/up.XXXXXX")
+    trap 'rm -rf "$up" "$up.d"' EXIT
+    head -c $((MAX_BYTES + 1)) > "$up"
+    [ "$(wc -c < "$up")" -le "$MAX_BYTES" ] || die "artifact larger than $MAX_BYTES bytes"
+    [ "$(sha256sum "$up" | cut -d' ' -f1)" = "$hex" ] || die "artifact does not match $digest"
+    if [ ! -d "$ROOT/releases/$hex" ]; then
+      # Checked before extracting, on the raw member names (-P: tar would otherwise strip / and ../ quietly),
+      # so no link can be written through and no path can leave the release.
+      list=$(tar -tvPf "$up") || die "artifact is not a tar"
+      printf '%s\n' "$list" | cut -c1 | grep -qv '[-d]' && die "only files and directories may be in the artifact"
+      printf '%s\n' "$list" | grep -Eq ' (->|link to) ' && die "links may not be in the artifact"
+      tar -tPf "$up" | grep -Eq '(^/|(^|/)\.\.(/|$))' && die "member path leaves the release"
+      mkdir "$up.d"
+      tar -xf "$up" -C "$up.d"
+      [ -z "$(find "$up.d" ! -type f ! -type d)" ] || die "only files and directories may be in the artifact"
+      [ -z "$(find "$up.d" -type f -links +1)" ] || die "links may not be in the artifact"
+      [ -f "$up.d/index.html" ] || die "no index.html at the top of the artifact"
+      mv "$up.d" "$ROOT/releases/$hex"
+    fi
+    printf '{"backendUrl":"%s"}\n' "$url" > "$ROOT/.config.json.new"
+    mv -f "$ROOT/.config.json.new" "$ROOT/config.json"
+    cur=$(served current)
+    if [ "$cur" != "$hex" ]; then
+      [ -z "$cur" ] || point previous "$cur"
+      point current "$hex"
+    fi
+    echo "$digest" ;;
+  "rollback 1")
+    cur=$(served current) prev=$(served previous)
+    { [ -n "$cur" ] && [ -n "$prev" ] && [ -d "$ROOT/releases/$prev" ]; } || die "no previous release to roll back to"
+    point current "$prev"
+    point previous "$cur"
+    echo "sha256:$prev" ;;
+  "status 1")
+    cur=$(served current)
+    [ -n "$cur" ] || die "nothing deployed"
+    echo "sha256:$cur" ;;
+  *) die "refused: only 'deploy <digest> <backend-url>', 'rollback' or 'status'" ;;
+esac

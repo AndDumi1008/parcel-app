@@ -1,0 +1,23 @@
+# sshd of the web deploy account only (AI-Gov-Layer PD-45): one user, one ed25519 key, the forced command,
+# no shell, no TTY, no forwarding of any kind.
+Port 2222
+HostKey /keys/ssh_host_ed25519_key
+PidFile /run/sshd.pid
+AllowUsers deploy
+PermitRootLogin no
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PubkeyAcceptedAlgorithms ssh-ed25519
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+AuthorizedKeysFile /etc/ssh/authorized_keys
+ForceCommand /usr/local/bin/web-deploy-shell
+DisableForwarding yes
+PermitTTY no
+PermitTunnel no
+PermitUserRC no
+PermitUserEnvironment no
+MaxAuthTries 3
+MaxSessions 1
+LoginGraceTime 20
+ClientAliveInterval 30

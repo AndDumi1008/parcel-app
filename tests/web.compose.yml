@@ -1,0 +1,7 @@
+# tests/web_test.sh only: reach the throw-away pair from the host. Real stacks publish neither port;
+# Caddy and the runners join the stack network instead (connect-caddy.sh).
+services:
+  web:
+    ports: ["127.0.0.1:18080:80"]
+  web-deploy:
+    ports: ["127.0.0.1:12222:2222"]

@@ -15,6 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
       - run: ./tests/run.sh
+  web-test:
+    name: web-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+      - run: ./tests/web_test.sh
   secrets:
     name: secrets
     runs-on: ubuntu-latest
