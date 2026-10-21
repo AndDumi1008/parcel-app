@@ -10,10 +10,17 @@ This repository is the subject of the quarantine proof (PR-1): it starts **quara
 | `supabase/seed/` | synthetic seed with fixed ids |
 | `scripts/mask.sql` | masking for preview/staging stacks: deterministic fake names and contacts, pseudonyms and postal areas kept |
 | `tests/rls_test.sql`, `tests/run.sh` | assertions of what each role can and cannot see; `make test` runs them in a throw-away PostgreSQL 16 |
+| `deploy/preview/` | one compose project per environment (`STACK_NAME`): PostgreSQL + PostgREST, the `web` static server and the `web-deploy` account |
+| `deploy/web/` | `web` Caddyfile, `web-deploy` image (sshd with a forced command that can only deploy, roll back or report), pinned host keys in `known_hosts` |
+| `scripts/web-remote.sh`, `web/placeholder/` | client behind `make web-deploy` / `web-rollback` / `web-status`; the placeholder page `make web-build` exports until the Next.js frontend lands |
+| `tests/web_test.sh` | deploy, rollback and refusals against a throw-away web + web-deploy pair (`make web-test`) |
 | `.github/workflows/ci.yml` | Gate 1 for this repository |
 
-Delivery path (AI-Gov-Layer docs/08, PaaS variant): preview, staging and production Supabase stacks on SERVER; frontend to follow.
+Delivery path (AI-Gov-Layer docs/08, PaaS variant): preview, staging and production stacks on SERVER, frontend included (AI-Gov-Layer PD-44). The web volume holds `releases/<digest>/`, `current` and `previous` links and `config.json`; only `web-deploy` writes it.
+
+Bringing up an environment's frontend (owner, on SERVER): create an ed25519 key pair, put the public half in `.env` as `WEB_DEPLOY_PUBKEY` and the private half in the GitHub environment as `WEB_DEPLOY_KEY`; `docker compose up -d`; commit the host key line `web-deploy` prints at start to `deploy/web/known_hosts`; join the AGL Caddy (`connect-caddy.sh`) and the runner allowed into this environment to the stack network.
 
 ```
 make test
+make web-test
 ```

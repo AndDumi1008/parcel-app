@@ -1,0 +1,23 @@
+# Static file server for one environment's frontend (AI-Gov-Layer PD-44). The web volume is mounted read-only:
+# current/ is the release the web-deploy account switched to, config.json carries this environment's backend URL.
+# Plain HTTP inside the stack network; TLS is terminated by the AGL Caddy in front.
+{
+	admin off
+	persist_config off
+	auto_https off
+}
+:80 {
+	handle /healthz {
+		respond "ok" 200
+	}
+	handle /config.json {
+		root * /srv
+		header Cache-Control "no-store"
+		file_server
+	}
+	handle {
+		root * /srv/current
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}

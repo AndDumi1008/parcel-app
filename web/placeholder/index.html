@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" data-app="parcel">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>parcel-app</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #1a1a1a; }
+  code { background: #f2f2f2; padding: 0.1rem 0.3rem; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>parcel-app</h1>
+<p>Placeholder release. The Next.js frontend replaces this page; the deploy path around it is the real one.</p>
+<p>Backend for this environment: <code id="backend">reading /config.json…</code></p>
+<script>
+  fetch("/config.json", { cache: "no-store" })
+    .then((r) => r.json())
+    .then((c) => { document.getElementById("backend").textContent = c.backendUrl; })
+    .catch(() => { document.getElementById("backend").textContent = "no /config.json"; });
+</script>
+</body>
+</html>
